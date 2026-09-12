@@ -1,0 +1,6 @@
+numpy
+pandas
+pillow
+plotly
+snowflake-connector-python
+streamlit
