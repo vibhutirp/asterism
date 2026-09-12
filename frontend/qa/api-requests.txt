@@ -1,0 +1,14 @@
+Temporary local HTTP contract probe, not the real backend.
+Browser UI: open universe, select slow first topic, immediately select second topic,
+inspect statement/missing provenance, filter by name, switch to List.
+
+2026-09-12T21:36:57.979Z GET /api/topics?workspaceId=demo
+2026-09-12T21:36:57.984Z GET /api/topics?workspaceId=demo
+2026-09-12T21:37:07.537Z GET /api/topics/probe-topic?workspaceId=demo
+2026-09-12T21:37:07.954Z GET /api/topics/probe-second?workspaceId=demo
+2026-09-12T21:37:17.955Z GET /api/topics?workspaceId=demo
+2026-09-12T21:37:17.956Z GET /api/topics/probe-second?workspaceId=demo
+
+Initial dev StrictMode can repeat a GET. No POST/PUT/PATCH/DELETE/query endpoint occurred.
+The slower topic's response did not replace the second selected topic.
+The next ten-second refresh fetched both topics and selected detail.
