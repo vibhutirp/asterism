@@ -504,9 +504,9 @@ with tab_map:
             yaxis_title="Behavior 2",
             zaxis_title="Behavior 3",
             bgcolor="rgba(5, 8, 20, 0.64)",
-            xaxis=dict(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)"),
-            yaxis=dict(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)"),
-            zaxis=dict(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)"),
+            xaxis=dict(showgrid=False, zeroline=False, showbackground=False),
+            yaxis=dict(showgrid=False, zeroline=False, showbackground=False),
+            zaxis=dict(showgrid=False, zeroline=False, showbackground=False),
             camera=dict(eye=dict(x=1.55, y=1.35, z=0.95)),
         ),
         legend_title_text="Group" if color_by == "Level 1 group" else "Cluster",
@@ -551,8 +551,8 @@ with tab_time:
         legend_title_text="Metric",
         margin=dict(l=8, r=8, t=16, b=8),
     )
-    time_fig.update_xaxes(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)")
-    time_fig.update_yaxes(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)")
+    time_fig.update_xaxes(showgrid=False, zeroline=False)
+    time_fig.update_yaxes(showgrid=False, zeroline=False)
     st.plotly_chart(time_fig, width="stretch")
 
     stage_summary = (
