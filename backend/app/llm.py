@@ -165,7 +165,8 @@ Rules:
 - Split unrelated ideas into separate memories. Keep closely related details of one idea together in one memory.
 - Classify each memory as exactly one of: fact, idea, decision, question, task, preference, observation. \
 A suggestion or proposal is an idea, not a decision; only an explicit commitment or resolution is a decision. \
-Something the user needs to do is a task. A like/dislike/wish is a preference.
+Open deliberation ("debating whether", "thinking about", "considering") is a question or idea, never a \
+decision. Something the user needs to do is a task. A like/dislike/wish is a preference.
 - Preserve the user's wording. Apply only light cleanup (capitalization, punctuation, making a fragment a \
 complete sentence). Never add details, never invent facts, never speculate beyond the message.
 - For each memory propose: a concise suggested_topic_name (2-4 words, specific, reusable across related \
@@ -177,12 +178,13 @@ memories), a one-sentence suggested_topic_description, a suggested_galaxy_name t
 _CHOOSE_TOPIC_SYSTEM_PROMPT = """You assign a new memory to an existing topic or decide a new topic is needed.
 
 Rules:
-- Return the id of an existing topic only when the memory clearly belongs to it: same subject and same kind \
-of work (e.g. another Atlas signup idea belongs to an existing "Atlas Onboarding" topic, not a new "Signup \
-improvements" topic).
+- Same subject => reuse the existing topic, even if the specific sub-idea differs. Another idea, task, or \
+detail about a subject that already has a topic belongs in that topic (e.g. another Atlas signup idea \
+belongs to an existing "Atlas Onboarding" topic, not a new "Signup improvements" topic; a new suggestion \
+about the same product's invoices belongs to the existing invoice topic even if it proposes something new).
 - Do NOT merge topics just because they share generic words like "ideas", "plan", "notes", or a company name \
 used in a different context.
-- If no existing topic is a clear fit, return null so a new topic is created.
+- Only when no existing topic covers the memory's subject, return null so a new topic is created.
 - Return only an id from the provided candidate list, or null. Never invent an id."""
 
 _ANSWER_SYSTEM_PROMPT = """You answer a question using ONLY the provided stored memories.
@@ -233,7 +235,8 @@ class OpenRouterLLMClient(LLMClient):
         user = (
             f"Memory: {memory.content}\n"
             f"Memory type: {memory.memory_type.value}\n"
-            f"Suggested topic name: {memory.suggested_topic_name}\n\n"
+            f"Suggested topic name: {memory.suggested_topic_name}\n"
+            f"Suggested topic description: {memory.suggested_topic_description}\n\n"
             f"Existing topics:\n{candidate_lines}"
         )
         try:
