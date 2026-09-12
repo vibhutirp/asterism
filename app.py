@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import json
+import os
 from io import BytesIO
 from typing import Dict, List
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 import numpy as np
 import pandas as pd
@@ -427,6 +431,114 @@ def cluster_summary(clustered: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def read_secret(name: str, fallback: str = "") -> str:
+    try:
+        return str(st.secrets.get(name, os.getenv(name, fallback)))
+    except Exception:
+        return os.getenv(name, fallback)
+
+
+def post_json(url: str, headers: Dict[str, str], payload: Dict) -> Dict:
+    request = Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={**headers, "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {error.code}: {body}") from error
+    except URLError as error:
+        raise RuntimeError(f"Network error: {error.reason}") from error
+
+
+def search_exa(query: str, api_key: str, result_count: int = 5) -> List[Dict]:
+    response = post_json(
+        "https://api.exa.ai/search",
+        headers={"x-api-key": api_key},
+        payload={
+            "query": query,
+            "numResults": result_count,
+            "type": "auto",
+            "contents": {"text": True},
+        },
+    )
+    return response.get("results", [])
+
+
+def summarize_with_openrouter(
+    model: str,
+    api_key: str,
+    account_email: str,
+    simulation_context: str,
+    search_results: List[Dict],
+) -> str:
+    sources = "\n".join(
+        f"- {result.get('title', 'Untitled')}: {result.get('url', '')}\n"
+        f"  {str(result.get('text', ''))[:800]}"
+        for result in search_results
+    )
+    prompt = (
+        "Summarize practical retail segmentation insights for this Streamlit simulation. "
+        "Focus on cluster interpretation, aging over time, and actions a store analyst could test.\n\n"
+        f"Simulation context:\n{simulation_context}\n\n"
+        f"Exa search results:\n{sources}"
+    )
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "HTTP-Referer": "https://github.com/vibhutirp/asterism",
+        "X-Title": "Asterism Store Purchase Cluster Simulation",
+    }
+    if account_email:
+        headers["X-OpenRouter-Account-Email"] = account_email
+
+    response = post_json(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers=headers,
+        payload={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a concise retail analytics assistant."},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.3,
+            "max_tokens": 700,
+        },
+    )
+    choices = response.get("choices", [])
+    if not choices:
+        return "OpenRouter returned no summary choices."
+    return choices[0].get("message", {}).get("content", "OpenRouter returned an empty summary.")
+
+
+def current_simulation_context(filtered: pd.DataFrame) -> str:
+    top_groups = (
+        filtered.groupby("level_1_group")
+        .agg(
+            transactions=("transaction_id", "count"),
+            avg_aged_total=("aged_total", "mean"),
+            avg_age_months=("elapsed_months", "mean"),
+            avg_churn_risk=("churn_risk", "mean"),
+        )
+        .round(2)
+        .reset_index()
+        .to_dict(orient="records")
+    )
+    return json.dumps(
+        {
+            "transaction_count": int(len(filtered)),
+            "aged_revenue": round(float(filtered["aged_total"].sum()), 2),
+            "avg_age_months": round(float(filtered["elapsed_months"].mean()), 2),
+            "avg_churn_risk": round(float(filtered["churn_risk"].mean()), 3),
+            "groups": top_groups,
+        },
+        indent=2,
+    )
+
+
 with st.sidebar:
     st.header("Simulation")
     transaction_count = st.slider("Test transactions", 80, 800, 260, 20)
@@ -438,6 +550,22 @@ with st.sidebar:
     color_by = st.radio("Map color", ["Level 1 group", "Detailed cluster"], horizontal=False)
     show_chart_grid = st.toggle("Show chart grid", value=False)
     selected_personas = st.multiselect("Filter personas", list(PERSONAS), default=list(PERSONAS))
+    st.divider()
+    with st.expander("External insights"):
+        exa_api_key = st.text_input("Exa API key", value=read_secret("EXA_API_KEY"), type="password")
+        openrouter_api_key = st.text_input(
+            "OpenRouter API key",
+            value=read_secret("OPENROUTER_API_KEY"),
+            type="password",
+        )
+        openrouter_email = st.text_input(
+            "OpenRouter account email",
+            value=read_secret("OPENROUTER_ACCOUNT_EMAIL"),
+        )
+        openrouter_model = st.text_input(
+            "OpenRouter model",
+            value=read_secret("OPENROUTER_MODEL", "openai/gpt-4o-mini"),
+        )
 
 transactions, items = build_transactions(transaction_count, int(seed), timeline_months)
 aged_transactions = age_transactions(transactions, simulation_age_months)
@@ -457,8 +585,16 @@ metric_b.metric("Aged revenue", f"${filtered['aged_total'].sum():,.0f}")
 metric_c.metric("Avg aged basket", f"${filtered['aged_total'].mean():.2f}")
 metric_d.metric("Avg age", f"{filtered['elapsed_months'].mean():.1f} mo")
 
-tab_map, tab_time, tab_groups, tab_clusters, tab_transactions, tab_catalog = st.tabs(
-    ["3D galaxy map", "Aging timeline", "Level 1 groups", "Cluster explorer", "Transactions", "Product catalog"]
+tab_map, tab_time, tab_groups, tab_clusters, tab_transactions, tab_catalog, tab_external = st.tabs(
+    [
+        "3D galaxy map",
+        "Aging timeline",
+        "Level 1 groups",
+        "Cluster explorer",
+        "Transactions",
+        "Product catalog",
+        "External insights",
+    ]
 )
 
 with tab_map:
@@ -726,3 +862,53 @@ with tab_catalog:
             )
             st.markdown(f"**{product['name']}**")
             st.caption(f"{product['category']} | SKU {product['sku']} | ${product['price']:.2f}")
+
+with tab_external:
+    st.write("Use Exa search and OpenRouter summarization to compare this simulated behavior with current retail analytics context.")
+    insight_query = st.text_input(
+        "Research query",
+        value="grocery retail customer segmentation purchase aging churn basket analysis",
+    )
+    result_count = st.slider("Exa results", 3, 10, 5)
+    run_external_insights = st.button("Run external insights")
+
+    if run_external_insights:
+        if not exa_api_key:
+            st.error("Add an Exa API key in the sidebar or set EXA_API_KEY.")
+        else:
+            with st.spinner("Searching Exa..."):
+                try:
+                    exa_results = search_exa(insight_query, exa_api_key, result_count)
+                except RuntimeError as error:
+                    st.error(str(error))
+                    st.stop()
+
+            if not exa_results:
+                st.warning("Exa returned no results for this query.")
+                st.stop()
+
+            st.subheader("Exa results")
+            for result in exa_results:
+                title = result.get("title") or "Untitled result"
+                url = result.get("url") or ""
+                text = str(result.get("text") or "").strip()
+                st.markdown(f"**[{title}]({url})**" if url else f"**{title}**")
+                st.caption(text[:360] + ("..." if len(text) > 360 else ""))
+
+            if openrouter_api_key:
+                with st.spinner("Summarizing with OpenRouter..."):
+                    try:
+                        summary = summarize_with_openrouter(
+                            openrouter_model,
+                            openrouter_api_key,
+                            openrouter_email,
+                            current_simulation_context(filtered),
+                            exa_results,
+                        )
+                    except RuntimeError as error:
+                        st.error(str(error))
+                    else:
+                        st.subheader("OpenRouter summary")
+                        st.write(summary)
+            else:
+                st.info("Add an OpenRouter API key to summarize the Exa results against the current simulation.")

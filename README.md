@@ -23,6 +23,21 @@ history window, simulation age month, and random seed. It includes a
 galaxy-themed 3D cluster map, aging timeline, cluster summaries, transaction
 drilldowns, and a product catalog with generated images.
 
+## Optional external insights
+
+The `External insights` tab can search Exa and summarize the results with
+OpenRouter. Provide credentials in the sidebar or set these environment
+variables before starting Streamlit:
+
+```powershell
+$env:EXA_API_KEY = "your-exa-api-key"
+$env:OPENROUTER_API_KEY = "your-openrouter-api-key"
+$env:OPENROUTER_ACCOUNT_EMAIL = "you@example.com"
+$env:OPENROUTER_MODEL = "openai/gpt-4o-mini"
+```
+
+Do not commit real API keys. If a key was pasted into a chat or log, rotate it.
+
 ## Snowflake Connection
 
 This project connects to Snowflake with `snowflake-connector-python`.
