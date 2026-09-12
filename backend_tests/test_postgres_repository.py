@@ -111,3 +111,75 @@ def test_postgres_repository_crud_search_and_reset(postgres_ready: str) -> None:
         repository.reset_workspace(workspace_id)
 
     assert repository.list_topics(workspace_id) == []
+
+
+def test_search_memories_matches_natural_language_questions(postgres_ready: str) -> None:
+    repository = PostgresMemoryRepository(postgres_ready)
+    workspace_id = f"repo-nl-{uuid4()}"
+
+    try:
+        repository.ensure_workspace(workspace_id, "NL Search Test")
+        conversation = repository.get_or_create_conversation(workspace_id, "external-c1", "web")
+        message = repository.create_message(
+            Message(
+                id=new_id(),
+                workspace_id=workspace_id,
+                conversation_id=conversation.id,
+                external_id="message-1",
+                role="user",
+                content="We should redesign the invoice PDF layout for Bloom clients.",
+                source="web",
+                source_url=None,
+                created_at=utc_now(),
+                processed_at=None,
+                processing_status="processed",
+            )
+        )
+        galaxy = repository.get_or_create_galaxy(workspace_id, "Product", "Product notes")
+        topic = repository.create_topic(
+            Topic(
+                id=new_id(),
+                workspace_id=workspace_id,
+                galaxy_id=galaxy.id,
+                galaxy_name=galaxy.name,
+                name="Bloom Invoices",
+                description="Invoice work for Bloom",
+                created_at=utc_now(),
+                updated_at=utc_now(),
+            )
+        )
+        memory = repository.create_memory(
+            Memory(
+                id=new_id(),
+                workspace_id=workspace_id,
+                topic_id=topic.id,
+                topic_name=topic.name,
+                message_id=message.id,
+                content="We should redesign the invoice PDF layout for Bloom clients.",
+                memory_type=MemoryType.idea,
+                confidence=0.9,
+                created_at=utc_now(),
+                source="web",
+                source_url=None,
+                source_timestamp=message.created_at,
+                approximate_token_count=10,
+            )
+        )
+
+        # A natural-language question shares only SOME words with the memory;
+        # retrieval must OR terms, not require all of them to match.
+        question = repository.search_memories(
+            workspace_id, "What changes are we planning for the Bloom invoice redesign?", [], limit=10
+        )
+        unrelated = repository.search_memories(
+            workspace_id, "What did we decide about the office lease renewal?", [], limit=10
+        )
+        stopwords_only = repository.search_memories(workspace_id, "what did we do", [], limit=10)
+        punctuation_only = repository.search_memories(workspace_id, "???", [], limit=10)
+
+        assert [item.id for item in question] == [memory.id]
+        assert unrelated == []
+        assert stopwords_only == []
+        assert punctuation_only == []
+    finally:
+        repository.reset_workspace(workspace_id)

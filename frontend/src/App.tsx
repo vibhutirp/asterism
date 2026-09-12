@@ -6,10 +6,12 @@ import { filterTopics, formatReceived, memoryTypeLabel } from './knowledge.ts';
 import { makeRepository } from './repository.ts';
 import { useKnowledge } from './useKnowledge.ts';
 import { IconControl } from './IconControl.tsx';
+import { AskCapture } from './AskCapture.tsx';
 
 const configuredMode = import.meta.env.VITE_DATA_MODE || 'fixture';
 const scenario = import.meta.env.DEV && configuredMode === 'fixture' ? new URLSearchParams(window.location.search).get('fixture') || '' : '';
-const repository = makeRepository(configuredMode === 'api' ? 'api' : 'fixture', import.meta.env.VITE_WORKSPACE_ID || 'demo', scenario);
+const workspaceId = import.meta.env.VITE_WORKSPACE_ID || 'demo';
+const repository = makeRepository(configuredMode === 'api' ? 'api' : 'fixture', workspaceId, scenario);
 const CloudUniverse = lazy(() => import('./CloudUniverse.tsx'));
 type Select = (id: string, element: HTMLElement) => void;
 
@@ -117,6 +119,7 @@ function Workspace({ repository }: { repository: Repository }) {
           {state.loaded && visibleTopics.length > 0 && view === 'list' && <TopicList topics={visibleTopics} selectedId={state.selectedId} onSelect={select} updates={state.updates} />}
         </div>
       </section>
+      {repository.mode === 'api' && <AskCapture workspace={workspaceId} onIngested={() => void state.refreshTopics()} />}
       {state.selectedId && <aside className="inspector" aria-label="Topic inspector" data-scene-obstacle>
         <>
           <div className="inspector-top"><span className="eyebrow">Topic details</span><button className="icon-button" aria-label="Close topic details" onClick={close}><X size={24} /></button></div>

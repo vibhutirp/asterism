@@ -1,6 +1,8 @@
 fastapi
 httpx
+openai
 psycopg[binary]
 pydantic-settings
 pytest
+slack-bolt
 uvicorn[standard]

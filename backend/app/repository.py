@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Protocol
 
 import psycopg
@@ -199,7 +200,14 @@ class PostgresMemoryRepository:
         return [_memory(row) for row in rows]
 
     def search_memories(self, workspace_id: str, query: str, topic_ids: list[str], limit: int) -> list[Memory]:
-        params: list[object] = [workspace_id, query]
+        # OR the query terms: a natural-language question must retrieve any memory
+        # matching some of its words (ranked), not only memories containing all of
+        # them — grounding filtering is the LLM's job, not retrieval's.
+        terms = re.findall(r"[A-Za-z0-9]+", query)
+        if not terms:
+            return []
+        ts_query = " | ".join(terms)
+        params: list[object] = [workspace_id, ts_query]
         topic_clause = ""
         if topic_ids:
             topic_clause = " AND m.topic_id = ANY(%s)"
@@ -210,13 +218,13 @@ class PostgresMemoryRepository:
                 _MEMORIES_SQL
                 + f"""
                 WHERE m.workspace_id = %s
-                  AND to_tsvector('english', m.content) @@ plainto_tsquery('english', %s)
+                  AND to_tsvector('english', m.content) @@ to_tsquery('english', %s)
                   {topic_clause}
-                ORDER BY ts_rank(to_tsvector('english', m.content), plainto_tsquery('english', %s)) DESC,
+                ORDER BY ts_rank(to_tsvector('english', m.content), to_tsquery('english', %s)) DESC,
                          m.created_at DESC
                 LIMIT %s
                 """,
-                tuple(params[:-1] + [query, params[-1]]),
+                tuple(params[:-1] + [ts_query, params[-1]]),
             ).fetchall()
         return [_memory(row) for row in rows]
 
