@@ -1,0 +1,6 @@
+fastapi
+httpx
+psycopg[binary]
+pydantic-settings
+pytest
+uvicorn[standard]
