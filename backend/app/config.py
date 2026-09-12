@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     default_context_tokens: int = 2000
     openrouter_api_key: str | None = Field(default=None, alias="OPENROUTER_API_KEY")
     openrouter_model: str = Field(default="openai/gpt-4o-mini", alias="OPENROUTER_MODEL")
+    slack_bot_token: str | None = Field(default=None, alias="SLACK_BOT_TOKEN")
+    slack_app_token: str | None = Field(default=None, alias="SLACK_APP_TOKEN")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
