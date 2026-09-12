@@ -1,0 +1,39 @@
+/* Observatory design tokens. Source: docs/design/observatory/tokens.json */
+:root {
+  --color-canvas: #080D19;
+  --color-panel: #101827;
+  --color-raised: #182338;
+  --color-hover: #202E45;
+  --color-source: #0C1422;
+  --color-quiet-border: #2A3850;
+  --color-control-border: #657C9E;
+  --color-primary: #EDF2FA;
+  --color-secondary: #B6C2D5;
+  --color-muted: #95A5BE;
+  --color-icon: #DAE9FF;
+  --color-link: #8DC6FF;
+  --color-focus: #BEDCFF;
+  --color-accent: #B8A7FF;
+  --color-on-accent: #101321;
+  --color-product: #83B8FF;
+  --color-personal: #7DDECA;
+  --color-saved: #7DDECA;
+  --color-processing: #C8B6FF;
+  --color-error: #FFB4B4;
+  --color-badge-text: #C7D4E8;
+  --color-badge-surface: #1D2940;
+  --color-label-backing: #13203A;
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-48: 48px;
+  --space-64: 64px;
+  --font-ui: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+  --control-radius: 8px;
+  --focus-width: 2px;
+  --focus-offset: 3px;
+  --transition: 150ms ease-out;
+}
