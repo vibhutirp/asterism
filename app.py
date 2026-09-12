@@ -5,7 +5,7 @@ import os
 from io import BytesIO
 from typing import Dict, List
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 import numpy as np
 import pandas as pd
@@ -446,13 +446,44 @@ def post_json(url: str, headers: Dict[str, str], payload: Dict) -> Dict:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=30) as response:
+        opener = build_opener(ProxyHandler({}))
+        with opener.open(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         body = error.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"HTTP {error.code}: {body}") from error
+        raise RuntimeError(f"{url} returned HTTP {error.code}: {body}") from error
     except URLError as error:
-        raise RuntimeError(f"Network error: {error.reason}") from error
+        raise RuntimeError(f"Could not connect to {url}: {error.reason}") from error
+
+
+def check_external_connections(exa_api_key: str, openrouter_api_key: str, openrouter_email: str, model: str) -> Dict[str, str]:
+    checks = {}
+
+    if exa_api_key:
+        try:
+            search_exa("retail analytics", exa_api_key, result_count=1)
+            checks["Exa"] = "Connected"
+        except RuntimeError as error:
+            checks["Exa"] = str(error)
+    else:
+        checks["Exa"] = "Missing EXA_API_KEY"
+
+    if openrouter_api_key:
+        try:
+            summarize_with_openrouter(
+                model,
+                openrouter_api_key,
+                openrouter_email,
+                "Connectivity check only.",
+                [{"title": "Connectivity check", "url": "", "text": "Return a short OK response."}],
+            )
+            checks["OpenRouter"] = "Connected"
+        except RuntimeError as error:
+            checks["OpenRouter"] = str(error)
+    else:
+        checks["OpenRouter"] = "Missing OPENROUTER_API_KEY"
+
+    return checks
 
 
 def search_exa(query: str, api_key: str, result_count: int = 5) -> List[Dict]:
@@ -870,7 +901,22 @@ with tab_external:
         value="grocery retail customer segmentation purchase aging churn basket analysis",
     )
     result_count = st.slider("Exa results", 3, 10, 5)
+    check_connections = st.button("Check API connections")
     run_external_insights = st.button("Run external insights")
+
+    if check_connections:
+        with st.spinner("Checking Exa and OpenRouter..."):
+            checks = check_external_connections(
+                exa_api_key,
+                openrouter_api_key,
+                openrouter_email,
+                openrouter_model,
+            )
+        for service, status in checks.items():
+            if status == "Connected":
+                st.success(f"{service}: {status}")
+            else:
+                st.error(f"{service}: {status}")
 
     if run_external_insights:
         if not exa_api_key:
