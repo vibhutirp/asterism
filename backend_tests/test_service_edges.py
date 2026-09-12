@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.domain import ExtractedMemory
+from backend.app.domain import ExtractedMemory, Memory, Topic, new_id, utc_now
 from backend.app.in_memory_repository import InMemoryMemoryRepository
-from backend.app.llm import HeuristicLLMClient, LLMClient
+from backend.app.llm import HeuristicLLMClient, LLMClient, TopicCandidate
 from backend.app.models import MemoryType, MessageIngestRequest, QueryRequest
 from backend.app.service import MemoryEngine
 
@@ -144,3 +144,98 @@ def test_preference_with_word_plan_is_currently_classified_as_task() -> None:
     memory = llm.extract_memories("I prefer annual plan.")[0]
 
     assert memory.memory_type == MemoryType.task
+
+
+def test_llm_base_client_methods_are_abstract() -> None:
+    llm = LLMClient()
+
+    with pytest.raises(NotImplementedError):
+        llm.extract_memories("hello")
+    with pytest.raises(NotImplementedError):
+        llm.choose_topic(
+            ExtractedMemory(
+                content="hello",
+                memory_type=MemoryType.idea,
+                confidence=0.5,
+                suggested_topic_name="General Notes",
+                suggested_topic_description="General",
+                suggested_galaxy_name="Personal",
+                suggested_galaxy_description="Personal",
+            ),
+            [],
+        )
+    with pytest.raises(NotImplementedError):
+        llm.answer_from_context("hello", [])
+
+
+def test_heuristic_choose_topic_by_overlapping_terms_and_unsupported_context() -> None:
+    llm = HeuristicLLMClient()
+    memory = ExtractedMemory(
+        content="Atlas onboarding should be lighter.",
+        memory_type=MemoryType.idea,
+        confidence=0.8,
+        suggested_topic_name="Atlas Onboarding Ideas",
+        suggested_topic_description="Signup work",
+        suggested_galaxy_name="Product",
+        suggested_galaxy_description="Product",
+    )
+
+    chosen = llm.choose_topic(
+        memory,
+        [
+            TopicCandidate(id="pricing", name="Atlas Pricing", description="Pricing", galaxy_name="Product"),
+            TopicCandidate(id="onboarding", name="Atlas Onboarding", description="Signup", galaxy_name="Product"),
+        ],
+    )
+    answer, insufficient = llm.answer_from_context("payroll", ["For Atlas, remove phone number from signup."])
+
+    assert chosen == "onboarding"
+    assert insufficient is True
+    assert answer == "I do not have enough stored context to answer that."
+
+
+def test_retrieve_context_deduplicates_repository_results() -> None:
+    class DuplicateSearchRepository(InMemoryMemoryRepository):
+        def search_memories(self, workspace_id: str, query: str, topic_ids: list[str], limit: int) -> list[Memory]:
+            results = super().search_memories(workspace_id, query, topic_ids, limit)
+            return results + results
+
+    engine = MemoryEngine(DuplicateSearchRepository(), HeuristicLLMClient())
+    engine.ingest_message(request())
+
+    context = engine.retrieve_context(
+        QueryRequest(workspaceId="demo", query="Atlas signup", maxContextTokens=2000, topicIds=[])
+    )
+
+    assert len(context.memories) == 1
+
+
+def test_in_memory_duplicate_topic_creation_returns_existing_topic() -> None:
+    repository = InMemoryMemoryRepository()
+    galaxy = repository.get_or_create_galaxy("demo", "Product", "Product notes")
+    topic = Topic(
+        id=new_id(),
+        workspace_id="demo",
+        galaxy_id=galaxy.id,
+        galaxy_name=galaxy.name,
+        name="Atlas Pricing",
+        description="Pricing",
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+
+    first = repository.create_topic(topic)
+    second = repository.create_topic(
+        Topic(
+            id=new_id(),
+            workspace_id="demo",
+            galaxy_id=galaxy.id,
+            galaxy_name=galaxy.name,
+            name="Atlas Pricing",
+            description="Duplicate",
+            created_at=utc_now(),
+            updated_at=utc_now(),
+        )
+    )
+
+    assert second.id == first.id

@@ -90,3 +90,38 @@ def test_streamlit_simulation_pipeline_invariants() -> None:
     assert standardize(np.ones((4, 3))).shape == (4, 3)
     assert len(kmeans(np.arange(20).reshape(10, 2).astype(float), 3, seed=1)) == 10
     assert pca_3d(np.arange(4).reshape(2, 2).astype(float)).shape == (2, 3)
+
+
+def test_streamlit_fallback_icon_and_premium_group_branch(monkeypatch) -> None:
+    pytest.importorskip("streamlit")
+    module = runpy.run_path(str(APP_PATH))
+
+    product_image_bytes = module["product_image_bytes"]
+    name_level_1_groups = module["name_level_1_groups"]
+    kmeans = module["kmeans"]
+    pd = module["pd"]
+    font = module["ImageFont"].load_default()
+
+    image = product_image_bytes("Mystery Item", "Other", "#123456")
+    assert image.startswith(b"\x89PNG")
+    monkeypatch.setattr(module["ImageFont"], "truetype", lambda *_args, **_kwargs: font)
+    uncached_image = product_image_bytes.__wrapped__("Mystery Item", "Other", "#123456")
+    assert uncached_image.startswith(b"\x89PNG")
+
+    row = {
+        "total": 120.0,
+        "item_count": 8,
+        "Bakery_spend": 1.0,
+        "Dairy_spend": 1.0,
+        "Drinks_spend": 1.0,
+        "Household_spend": 1.0,
+        "Personal Care_spend": 1.0,
+        "Pet_spend": 1.0,
+        "Produce_spend": 75.0,
+        "Snacks_spend": 1.0,
+    }
+    groups = name_level_1_groups(pd.DataFrame([row]), np.array([0]))
+
+    assert groups.tolist() == ["Premium mixed baskets"]
+    labels = kmeans(np.array([[0.0], [0.0], [10.0]]), 3, seed=1, max_iterations=2)
+    assert len(labels) == 3
