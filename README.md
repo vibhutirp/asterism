@@ -1,8 +1,8 @@
 # Asterism Memory
 
-Asterism Memory is a conversational memory engine that turns scattered messages into organized, source-backed knowledge. It helps people and teams remember what was said, why it mattered, and where it came from.
+Asterism Memory is a local-first conversational memory agent that turns scattered messages into organized, source-backed knowledge. It helps people and teams remember what was said, why it mattered, and where it came from.
 
-Instead of forcing users to manually maintain notes, folders, or knowledge-base pages, Asterism captures small "atomic memories" from conversations, groups them into meaningful topics, and answers questions only from stored context.
+Instead of forcing users to manually maintain notes, folders, or knowledge-base pages, Asterism captures small "atomic memories" from conversations, groups them into meaningful topics and galaxies, and answers questions only from stored context.
 
 ## Problem Context
 
@@ -67,6 +67,8 @@ Asterism should:
 
 ## Key Features
 
+- **Multi-tool ingestion:** Asterism is designed to capture context from the places where users already work and talk, including Slack DMs, AI-agent chats, project notes, documents, email, and other collaboration tools. In this prototype, Slack DM-style messages are represented through the backend ingestion workflow, and the same structure can extend to additional tools over time.
+- **Local memory agent workflow:** Users send conversation messages into the system, Asterism converts those messages into memories, and those memories can be searched later by topic or galaxy.
 - **Automatic memory capture:** Breaks long conversations into focused, reusable memories.
 - **Topic organization:** Groups related memories into topics so users can find context by subject instead of scrolling through old conversations.
 - **Galaxy-level structure:** Connects related topics into broader galaxies, making it easier to browse larger areas of work or life.
@@ -74,10 +76,12 @@ Asterism should:
 - **Grounded question answering:** Answers questions from stored memories and clearly reports when there is not enough context.
 - **Duplicate-safe ingestion:** Recognizes repeated external events so the same message is not saved twice.
 - **Local-first storage:** Uses local storage for the prototype, keeping memory private and under user control.
+- **Agentic organization:** Asterism does more than answer a prompt. It actively organizes context, links memories to their sources, avoids duplicate records, and refuses to answer when the stored context is not strong enough.
+- **Team context sharing:** Software engineers and project teams can preserve setup notes, debugging decisions, and AI-agent responses so the rest of the team can understand the context behind a project.
 
 ## Product Walkthrough
 
-1. A message enters Asterism from a source such as web, chat, notes, or a future connector.
+1. A message enters Asterism from a source such as a Slack DM, web input, notes, or a future connector.
 2. The backend extracts the message into smaller memories.
 3. Each memory is assigned to a topic, such as "Atlas Onboarding" or "Launch".
 4. Asterism stores the memory, topic, source, and confidence metadata.
@@ -89,6 +93,21 @@ Example:
 > "For Atlas, remove phone number from signup. Separately I want to plan a camping trip."
 
 Asterism turns that into separate memories under separate topics, rather than mixing unrelated ideas into one note.
+
+A user could later ask, "What did we decide about the onboarding flow?" Asterism retrieves the relevant memories from the matching topic or galaxy and answers from that stored context, rather than generating a response from general knowledge.
+
+## Brief Architecture
+
+Asterism is built around a simple memory pipeline:
+
+- **Message intake:** Conversation messages enter through the API with workspace, conversation, source, and event details.
+- **Memory engine:** The backend extracts focused memories, assigns each one to a topic, and groups related topics into galaxies.
+- **Local storage:** Memories, topics, galaxies, and source details are stored locally so users keep control over their information.
+- **Grounded query:** When a user asks a question, Asterism retrieves relevant stored memories and answers only from that context.
+- **Reliability safeguards:** Duplicate handling, insufficient-context responses, and source provenance make the workflow safer and easier to trust.
+- **Evaluation support:** Demo data, automated tests, and supporting prototypes make the workflow easy for judges and developers to inspect.
+
+For detailed request and response shapes, see `backend/API_CONTRACT.md`.
 
 ## Market Environment and Competitor Analysis
 
@@ -103,7 +122,7 @@ The market already has many tools for storing information, but each category lea
 | Vector search tools | Pinecone, Weaviate, custom RAG stacks | Powerful retrieval infrastructure | Developer-focused, not a ready product experience for memory capture |
 | CRMs and support tools | Salesforce, HubSpot, Zendesk | Strong record systems for customers | Narrow domain models and limited personal/team context memory |
 
-Asterism sits between these categories. It is not just search, not just notes, and not just a chatbot. It is a memory layer that captures meaning from conversations and keeps the original source attached.
+Asterism sits between these categories. It is not just search, not just notes, and not just a chatbot. Its value comes from living alongside conversations, where context is created, and then turning those moments into durable memory that can be reused later. That value would be much weaker in a standalone chatbox because the agent would not be connected to the flow of work where decisions and context appear.
 
 ## Sustainable Advantage
 
@@ -113,7 +132,7 @@ Asterism can build a durable advantage through:
 - **Automatic organization:** Users should not need to create folders or maintain perfect notes.
 - **Cross-conversation context:** Asterism can connect related information across many threads, tools, and time periods.
 - **Privacy-conscious architecture:** The backend can run locally or in a controlled environment, which matters for personal and workplace memory.
-- **Extensible connectors:** The same memory model can support Slack, documents, email, meeting transcripts, tickets, analytics systems, and personal notes.
+- **Extensible connectors:** The same memory model can support Slack DMs, documents, email, meeting transcripts, tickets, analytics systems, and personal notes.
 - **Grounded refusal:** The system is designed to say "I do not have enough context" instead of inventing unsupported answers.
 
 The market is missing a lightweight, trustworthy memory system that lives across tools without forcing users into a heavy knowledge-management process. Asterism is aimed at that gap.
@@ -141,7 +160,11 @@ python -m pip install -r backend/requirements.txt
 
 ### 2. Configure local storage
 
-Set the database connection string for your local environment. Keep credentials out of source control.
+Set `DATABASE_URL` to the connection string for your local database environment. Keep credentials out of source control.
+
+```bash
+export DATABASE_URL="your-local-database-connection-string"
+```
 
 ### 3. Run migrations
 
@@ -187,7 +210,7 @@ python -m streamlit run app.py
 
 ## Testing and Quality
 
-The project includes unit, integration, and end-to-end tests covering the memory engine, API routes, local storage layer, scripts, Streamlit prototype, and Snowflake connection helper.
+The project includes unit, integration, and end-to-end tests covering the memory engine, API routes, local storage layer, scripts, Streamlit prototype, and Snowflake connection helper. The suite covers core behavior, database-backed integration flows, live API requests, Streamlit smoke tests, duplicate handling, grounded retrieval, and optional external integration checks.
 
 Run the test suite:
 
