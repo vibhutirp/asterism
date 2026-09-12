@@ -1,5 +1,6 @@
 fastapi
 httpx
+openai
 psycopg[binary]
 pydantic-settings
 pytest
