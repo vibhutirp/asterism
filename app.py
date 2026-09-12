@@ -17,6 +17,69 @@ st.set_page_config(
 )
 
 
+def inject_galaxy_theme() -> None:
+    st.markdown(
+        """
+        <style>
+        :root {
+            --panel: rgba(12, 18, 36, 0.82);
+            --panel-border: rgba(149, 180, 255, 0.24);
+            --text: #edf2ff;
+            --muted: #b6c2df;
+            --accent: #9ec5fe;
+        }
+
+        .stApp {
+            color: var(--text);
+            background:
+                radial-gradient(circle at 18% 22%, rgba(68, 92, 180, 0.38) 0 2px, transparent 3px),
+                radial-gradient(circle at 72% 18%, rgba(255, 255, 255, 0.7) 0 1px, transparent 2px),
+                radial-gradient(circle at 84% 68%, rgba(158, 197, 254, 0.5) 0 1px, transparent 2px),
+                radial-gradient(circle at 32% 78%, rgba(255, 235, 186, 0.65) 0 1px, transparent 2px),
+                linear-gradient(142deg, #060814 0%, #111b3c 42%, #211338 72%, #060814 100%);
+            background-attachment: fixed;
+        }
+
+        .stApp::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                radial-gradient(circle, rgba(255, 255, 255, 0.56) 0 1px, transparent 1.6px),
+                radial-gradient(circle, rgba(158, 197, 254, 0.42) 0 1px, transparent 1.8px);
+            background-position: 0 0, 42px 24px;
+            background-size: 96px 96px, 132px 132px;
+            opacity: 0.45;
+        }
+
+        [data-testid="stSidebar"], [data-testid="stHeader"] {
+            background: rgba(5, 8, 20, 0.72);
+        }
+
+        [data-testid="stMetric"], [data-testid="stDataFrame"], .stTabs [data-baseweb="tab-panel"] {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+
+        h1, h2, h3, p, label, span, div {
+            letter-spacing: 0;
+        }
+
+        .stCaption, [data-testid="stMarkdownContainer"] p {
+            color: var(--muted);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+inject_galaxy_theme()
+
+
 PRODUCTS = [
     {"sku": "APL-001", "name": "Organic Apples", "category": "Produce", "price": 4.99, "color": "#2f9e44"},
     {"sku": "BAN-002", "name": "Banana Bunch", "category": "Produce", "price": 2.49, "color": "#f1c40f"},
@@ -142,7 +205,7 @@ def draw_product_icon(draw: ImageDraw.ImageDraw, name: str, category: str, color
 
 
 @st.cache_data
-def build_transactions(transaction_count: int, seed: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_transactions(transaction_count: int, seed: int, timeline_months: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     rng = np.random.default_rng(seed)
     product_df = pd.DataFrame(PRODUCTS)
     product_lookup = {product["sku"]: product for product in PRODUCTS}
@@ -156,6 +219,7 @@ def build_transactions(transaction_count: int, seed: int) -> tuple[pd.DataFrame,
         persona_name = rng.choice(persona_names, p=persona_weights)
         persona = PERSONAS[persona_name]
         customer_id = f"C{rng.integers(1000, 1065)}"
+        purchase_age_months = int(rng.integers(0, timeline_months + 1))
         item_count = max(1, int(rng.normal(persona["basket"], 2)))
         hour = int(np.clip(rng.normal(18 if "weekly" in persona_name else 13, 4), 7, 22))
         weekday = int(rng.integers(0, 7))
@@ -182,6 +246,7 @@ def build_transactions(transaction_count: int, seed: int) -> tuple[pd.DataFrame,
                 {
                     "transaction_id": transaction_id,
                     "customer_id": customer_id,
+                    "purchase_age_months": purchase_age_months,
                     "sku": product["sku"],
                     "product_name": product["name"],
                     "category": product["category"],
@@ -198,6 +263,7 @@ def build_transactions(transaction_count: int, seed: int) -> tuple[pd.DataFrame,
                 "transaction_id": transaction_id,
                 "customer_id": customer_id,
                 "persona": persona_name,
+                "purchase_age_months": purchase_age_months,
                 "item_count": item_count,
                 "subtotal": round(subtotal, 2),
                 "discount_rate": round(discount_rate, 3),
@@ -214,13 +280,41 @@ def build_transactions(transaction_count: int, seed: int) -> tuple[pd.DataFrame,
     return pd.DataFrame(transaction_rows), pd.DataFrame(item_rows)
 
 
+def age_transactions(transactions: pd.DataFrame, simulation_age_months: int) -> pd.DataFrame:
+    aged = transactions.copy()
+    elapsed_months = (simulation_age_months - aged["purchase_age_months"]).clip(lower=0)
+    age_factor = elapsed_months / max(simulation_age_months, 1)
+    inflation_multiplier = 1 + (elapsed_months * 0.0035)
+    recency_weight = np.exp(-elapsed_months / 10)
+
+    aged["elapsed_months"] = elapsed_months.astype(int)
+    aged["recency_weight"] = recency_weight.round(3)
+    aged["aged_subtotal"] = (aged["subtotal"] * inflation_multiplier).round(2)
+    aged["aged_total"] = (aged["total"] * inflation_multiplier).round(2)
+    aged["aging_score"] = (age_factor * 100).round(1)
+    aged["churn_risk"] = np.clip(0.12 + age_factor * 0.58 - aged["loyalty_member"].astype(float) * 0.16, 0.03, 0.92).round(3)
+    aged["lifecycle_stage"] = np.select(
+        [
+            elapsed_months <= 3,
+            elapsed_months <= 9,
+            elapsed_months <= 18,
+        ],
+        ["New signal", "Maturing signal", "Aged signal"],
+        default="Dormant signal",
+    )
+    return aged
+
+
 def cluster_transactions(transactions: pd.DataFrame, cluster_count: int) -> pd.DataFrame:
     feature_columns = [
         "item_count",
-        "subtotal",
+        "aged_subtotal",
         "discount_rate",
-        "total",
+        "aged_total",
         "hour",
+        "elapsed_months",
+        "recency_weight",
+        "churn_risk",
         "weekend",
         "loyalty_member",
         *[f"{category}_spend" for category in CATEGORY_ORDER],
@@ -309,12 +403,25 @@ def cluster_summary(clustered: pd.DataFrame) -> pd.DataFrame:
         .agg(
             transactions=("transaction_id", "count"),
             avg_total=("total", "mean"),
+            avg_aged_total=("aged_total", "mean"),
             avg_items=("item_count", "mean"),
             avg_discount=("discount_rate", "mean"),
+            avg_age_months=("elapsed_months", "mean"),
+            avg_churn_risk=("churn_risk", "mean"),
             loyalty_rate=("loyalty_member", "mean"),
             peak_hour=("hour", lambda series: int(round(series.mean()))),
         )
-        .round({"avg_total": 2, "avg_items": 1, "avg_discount": 3, "loyalty_rate": 2})
+        .round(
+            {
+                "avg_total": 2,
+                "avg_aged_total": 2,
+                "avg_items": 1,
+                "avg_discount": 3,
+                "avg_age_months": 1,
+                "avg_churn_risk": 3,
+                "loyalty_rate": 2,
+            }
+        )
         .reset_index()
         .sort_values(["level_1_group", "cluster"])
     )
@@ -324,17 +431,20 @@ with st.sidebar:
     st.header("Simulation")
     transaction_count = st.slider("Test transactions", 80, 800, 260, 20)
     cluster_count = st.slider("Clusters", 2, 8, 4)
+    timeline_months = st.slider("History window months", 6, 36, 24, 3)
+    simulation_age_months = st.slider("Simulation age month", 0, timeline_months, min(12, timeline_months))
     seed = st.number_input("Random seed", min_value=1, max_value=9999, value=127, step=1)
     st.divider()
     color_by = st.radio("Map color", ["Level 1 group", "Detailed cluster"], horizontal=False)
     selected_personas = st.multiselect("Filter personas", list(PERSONAS), default=list(PERSONAS))
 
-transactions, items = build_transactions(transaction_count, int(seed))
-clustered = cluster_transactions(transactions, cluster_count)
+transactions, items = build_transactions(transaction_count, int(seed), timeline_months)
+aged_transactions = age_transactions(transactions, simulation_age_months)
+clustered = cluster_transactions(aged_transactions, cluster_count)
 filtered = clustered[clustered["persona"].isin(selected_personas)].copy()
 
-st.title("Store Purchase Cluster Simulation")
-st.caption("Synthetic grocery transactions with product-like images, first-level basket groups, and detailed clustering.")
+st.title("Asterism Store Purchase Cluster Simulation")
+st.caption("Galaxy-themed purchase constellations with product-like images, first-level basket groups, detailed clusters, and aging over time.")
 
 if filtered.empty:
     st.warning("Select at least one persona to show clustered purchase simulations.")
@@ -342,12 +452,12 @@ if filtered.empty:
 
 metric_a, metric_b, metric_c, metric_d = st.columns(4)
 metric_a.metric("Transactions", f"{len(filtered):,}")
-metric_b.metric("Revenue", f"${filtered['total'].sum():,.0f}")
-metric_c.metric("Avg basket", f"${filtered['total'].mean():.2f}")
-metric_d.metric("Items sold", f"{int(filtered['item_count'].sum()):,}")
+metric_b.metric("Aged revenue", f"${filtered['aged_total'].sum():,.0f}")
+metric_c.metric("Avg aged basket", f"${filtered['aged_total'].mean():.2f}")
+metric_d.metric("Avg age", f"{filtered['elapsed_months'].mean():.1f} mo")
 
-tab_map, tab_groups, tab_clusters, tab_transactions, tab_catalog = st.tabs(
-    ["3D cluster map", "Level 1 groups", "Cluster explorer", "Transactions", "Product catalog"]
+tab_map, tab_time, tab_groups, tab_clusters, tab_transactions, tab_catalog = st.tabs(
+    ["3D galaxy map", "Aging timeline", "Level 1 groups", "Cluster explorer", "Transactions", "Product catalog"]
 )
 
 with tab_map:
@@ -366,8 +476,12 @@ with tab_map:
             "cluster",
             "persona",
             "total",
+            "aged_total",
             "item_count",
             "discount_rate",
+            "elapsed_months",
+            "lifecycle_stage",
+            "churn_risk",
         ],
         labels={
             "x": "Behavior component 1",
@@ -382,27 +496,104 @@ with tab_map:
     fig.update_traces(marker=dict(opacity=0.78, line=dict(width=0.5, color="#ffffff")))
     fig.update_layout(
         margin=dict(l=0, r=0, t=24, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#edf2ff"),
         scene=dict(
             xaxis_title="Behavior 1",
             yaxis_title="Behavior 2",
             zaxis_title="Behavior 3",
+            bgcolor="rgba(5, 8, 20, 0.64)",
+            xaxis=dict(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)"),
+            yaxis=dict(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)"),
+            zaxis=dict(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)"),
+            camera=dict(eye=dict(x=1.55, y=1.35, z=0.95)),
         ),
         legend_title_text="Group" if color_by == "Level 1 group" else "Cluster",
     )
     st.plotly_chart(fig, width="stretch")
+
+with tab_time:
+    timeline = []
+    for month in range(timeline_months + 1):
+        month_frame = age_transactions(transactions, month)
+        timeline.append(
+            {
+                "month": month,
+                "aged_revenue": month_frame["aged_total"].sum(),
+                "avg_age_months": month_frame["elapsed_months"].mean(),
+                "avg_churn_risk": month_frame["churn_risk"].mean(),
+                "active_weight": month_frame["recency_weight"].sum(),
+            }
+        )
+    timeline_df = pd.DataFrame(timeline)
+    timeline_long = timeline_df.melt(
+        id_vars="month",
+        value_vars=["aged_revenue", "avg_age_months", "avg_churn_risk", "active_weight"],
+        var_name="aging_metric",
+        value_name="value",
+    )
+    time_fig = px.line(
+        timeline_long,
+        x="month",
+        y="value",
+        color="aging_metric",
+        markers=True,
+        labels={"month": "Simulation month", "value": "Metric value", "aging_metric": "Aging metric"},
+        height=420,
+        color_discrete_sequence=["#9ec5fe", "#ffd43b", "#ff8787", "#69db7c"],
+    )
+    time_fig.add_vline(x=simulation_age_months, line_width=3, line_dash="dot", line_color="#ffffff")
+    time_fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(5, 8, 20, 0.58)",
+        font=dict(color="#edf2ff"),
+        legend_title_text="Metric",
+        margin=dict(l=8, r=8, t=16, b=8),
+    )
+    time_fig.update_xaxes(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)")
+    time_fig.update_yaxes(gridcolor="rgba(158,197,254,0.18)", zerolinecolor="rgba(255,255,255,0.2)")
+    st.plotly_chart(time_fig, width="stretch")
+
+    stage_summary = (
+        filtered.groupby("lifecycle_stage")
+        .agg(
+            transactions=("transaction_id", "count"),
+            aged_revenue=("aged_total", "sum"),
+            avg_age_months=("elapsed_months", "mean"),
+            avg_churn_risk=("churn_risk", "mean"),
+            active_weight=("recency_weight", "sum"),
+        )
+        .round({"aged_revenue": 2, "avg_age_months": 1, "avg_churn_risk": 3, "active_weight": 1})
+        .reset_index()
+        .sort_values("avg_age_months")
+    )
+    st.dataframe(stage_summary, width="stretch", hide_index=True)
 
 with tab_groups:
     group_summary = (
         filtered.groupby("level_1_group")
         .agg(
             transactions=("transaction_id", "count"),
-            revenue=("total", "sum"),
-            avg_total=("total", "mean"),
+            aged_revenue=("aged_total", "sum"),
+            avg_aged_total=("aged_total", "mean"),
             avg_items=("item_count", "mean"),
             avg_discount=("discount_rate", "mean"),
+            avg_age_months=("elapsed_months", "mean"),
+            avg_churn_risk=("churn_risk", "mean"),
             loyalty_rate=("loyalty_member", "mean"),
         )
-        .round({"revenue": 2, "avg_total": 2, "avg_items": 1, "avg_discount": 3, "loyalty_rate": 2})
+        .round(
+            {
+                "aged_revenue": 2,
+                "avg_aged_total": 2,
+                "avg_items": 1,
+                "avg_discount": 3,
+                "avg_age_months": 1,
+                "avg_churn_risk": 3,
+                "loyalty_rate": 2,
+            }
+        )
         .reset_index()
         .sort_values("transactions", ascending=False)
     )
@@ -462,6 +653,10 @@ with tab_transactions:
             "cluster": detail["cluster"],
             "persona": detail["persona"],
             "total": f"${detail['total']:.2f}",
+            "aged_total": f"${detail['aged_total']:.2f}",
+            "elapsed_months": int(detail["elapsed_months"]),
+            "lifecycle_stage": detail["lifecycle_stage"],
+            "churn_risk": f"{detail['churn_risk']:.1%}",
             "discount_rate": f"{detail['discount_rate']:.1%}",
             "hour": int(detail["hour"]),
             "loyalty_member": bool(detail["loyalty_member"]),
@@ -485,6 +680,11 @@ with tab_transactions:
         "subtotal",
         "discount_rate",
         "total",
+        "aged_total",
+        "elapsed_months",
+        "lifecycle_stage",
+        "churn_risk",
+        "recency_weight",
         "hour",
         "weekend",
         "loyalty_member",

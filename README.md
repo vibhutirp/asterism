@@ -18,9 +18,10 @@ Start the app:
 python -m streamlit run app.py
 ```
 
-The app lets you adjust transaction volume, number of clusters, and random seed.
-It includes a cluster map, cluster summaries, transaction drilldowns, and a
-product catalog with generated images.
+The app lets you adjust transaction volume, number of clusters, transaction
+history window, simulation age month, and random seed. It includes a
+galaxy-themed 3D cluster map, aging timeline, cluster summaries, transaction
+drilldowns, and a product catalog with generated images.
 
 ## Snowflake Connection
 
