@@ -436,6 +436,7 @@ with st.sidebar:
     seed = st.number_input("Random seed", min_value=1, max_value=9999, value=127, step=1)
     st.divider()
     color_by = st.radio("Map color", ["Level 1 group", "Detailed cluster"], horizontal=False)
+    show_chart_grid = st.toggle("Show chart grid", value=False)
     selected_personas = st.multiselect("Filter personas", list(PERSONAS), default=list(PERSONAS))
 
 transactions, items = build_transactions(transaction_count, int(seed), timeline_months)
@@ -462,6 +463,18 @@ tab_map, tab_time, tab_groups, tab_clusters, tab_transactions, tab_catalog = st.
 
 with tab_map:
     color_column = "level_1_group" if color_by == "Level 1 group" else "cluster"
+    axis_style = (
+        dict(
+            showgrid=True,
+            gridcolor="rgba(158,197,254,0.18)",
+            zeroline=True,
+            zerolinecolor="rgba(255,255,255,0.2)",
+            showbackground=True,
+            backgroundcolor="rgba(5, 8, 20, 0.28)",
+        )
+        if show_chart_grid
+        else dict(showgrid=False, zeroline=False, showbackground=False)
+    )
     fig = px.scatter_3d(
         filtered,
         x="x",
@@ -504,9 +517,9 @@ with tab_map:
             yaxis_title="Behavior 2",
             zaxis_title="Behavior 3",
             bgcolor="rgba(5, 8, 20, 0.64)",
-            xaxis=dict(showgrid=False, zeroline=False, showbackground=False),
-            yaxis=dict(showgrid=False, zeroline=False, showbackground=False),
-            zaxis=dict(showgrid=False, zeroline=False, showbackground=False),
+            xaxis=axis_style,
+            yaxis=axis_style,
+            zaxis=axis_style,
             camera=dict(eye=dict(x=1.55, y=1.35, z=0.95)),
         ),
         legend_title_text="Group" if color_by == "Level 1 group" else "Cluster",
@@ -551,8 +564,18 @@ with tab_time:
         legend_title_text="Metric",
         margin=dict(l=8, r=8, t=16, b=8),
     )
-    time_fig.update_xaxes(showgrid=False, zeroline=False)
-    time_fig.update_yaxes(showgrid=False, zeroline=False)
+    time_fig.update_xaxes(
+        showgrid=show_chart_grid,
+        gridcolor="rgba(158,197,254,0.18)",
+        zeroline=show_chart_grid,
+        zerolinecolor="rgba(255,255,255,0.2)",
+    )
+    time_fig.update_yaxes(
+        showgrid=show_chart_grid,
+        gridcolor="rgba(158,197,254,0.18)",
+        zeroline=show_chart_grid,
+        zerolinecolor="rgba(255,255,255,0.2)",
+    )
     st.plotly_chart(time_fig, width="stretch")
 
     stage_summary = (
