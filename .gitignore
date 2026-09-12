@@ -3,3 +3,6 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.pytest_cache/
+AGENTS.md
+backend/BACKEND_MEMORY_PLAN.md
