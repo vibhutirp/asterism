@@ -26,7 +26,7 @@ docker run -d --name asterism-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=as
 ```bash
 docker start asterism-pg                      # Postgres up
 python -m backend.scripts.migrate             # apply schema (idempotent)
-uvicorn backend.app.main:app --port 8000      # API on :8000 (leave running)
+python -m uvicorn backend.app.main:app --port 8000    # API on :8000 (leave running)
 ```
 
 In a second terminal:

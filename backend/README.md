@@ -31,7 +31,7 @@ python -m backend.scripts.seed_demo
 ## Run
 
 ```bash
-uvicorn backend.app.main:app --reload
+python -m uvicorn backend.app.main:app --reload
 ```
 
 ## Test

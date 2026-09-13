@@ -79,7 +79,7 @@ python -m backend.scripts.migrate
 ## Run the server
 
 ```bash
-uvicorn backend.app.main:app --port 8000
+python -m uvicorn backend.app.main:app --port 8000
 ```
 
 Interactive docs at http://127.0.0.1:8000/docs.
