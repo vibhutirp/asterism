@@ -1,4 +1,4 @@
-# Asterism — Secondary Brain
+# Asterism Memory
 
 Asterism Memory is a local-first conversational memory agent that turns scattered messages
 into organized, source-backed knowledge. It captures small "atomic memories" from
