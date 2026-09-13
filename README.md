@@ -1,12 +1,57 @@
 # Asterism — Secondary Brain
 
-Asterism is a conversational memory layer. It ingests messages (web, Slack DMs, seeds),
-uses an LLM to extract atomic memories and organize them into topics and galaxies, persists
-everything with provenance in Postgres, and answers questions grounded strictly in stored
-context — saying "not enough stored context" instead of inventing answers.
+Asterism Memory is a local-first conversational memory agent that turns scattered messages
+into organized, source-backed knowledge. It captures small "atomic memories" from
+conversations, groups them into meaningful topics and galaxies, and answers questions only
+from stored context — it helps people and teams remember what was said, why it mattered,
+and where it came from.
 
-Product background, target users, and market context: [docs/PRODUCT.md](docs/PRODUCT.md).
-Demo runbook (cold start to demo-ready): [DEMO.md](DEMO.md).
+## The problem
+
+Imagine trying to find one important decision in a busy Slack channel. You remember someone
+said it last week, but not the exact words. You scroll threads, try a few keyword searches,
+open old messages — and still have to reconstruct the answer yourself. The same thing
+happens with AI-agent chats, where product strategy, database setup, and test coverage all
+blur into one long thread. People rarely lose context because they lack information; they
+lose it because information is scattered, duplicated, buried, or disconnected from its
+source:
+
+- Decisions are made in chat but never copied into documentation.
+- Ideas are repeated because nobody remembers where they were discussed.
+- Search returns long threads, not clear answers.
+- AI assistants summarize confidently without showing their evidence.
+
+## What Asterism does
+
+- **Automatic memory capture** — an LLM splits each message into focused, atomic memories
+  (idea, decision, task, question, preference, fact, observation).
+- **Topic & galaxy organization** — memories are grouped into topics ("Atlas Onboarding",
+  "Camping Trip") inside broader galaxies ("Product", "Personal"); related follow-ups reuse
+  the existing topic instead of spawning near-duplicates.
+- **Source-backed recall** — every memory keeps provenance (message, source, timestamp,
+  permalink), so answers can be traced to the original conversation.
+- **Grounded question answering** — answers come only from retrieved stored memories, and
+  the system says "I don't have enough stored context" instead of inventing one.
+- **Duplicate-safe ingestion** — repeated deliveries of the same external event (Slack
+  retries included) never create duplicate memories.
+- **A 3D knowledge universe** — the React frontend renders topics as galaxy-grouped star
+  clouds you can explore, inspect, and query.
+
+## See it in action
+
+Send one mixed message:
+
+> "For Atlas, remove phone number from signup. Separately I want to plan a camping trip."
+
+Asterism stores two memories under two different topics in two different galaxies. Ask
+later — *"What onboarding improvements have we discussed for Atlas?"* — and it answers from
+those stored memories with a "grounded in N memories" citation, never from general
+knowledge.
+
+Full product context — target users, user stories, market analysis, roadmap:
+[docs/PRODUCT.md](docs/PRODUCT.md). Demo runbook: [DEMO.md](DEMO.md).
+
+---
 
 ## Architecture
 
