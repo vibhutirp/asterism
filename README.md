@@ -1,20 +1,10 @@
 # Asterism Memory
 
-Asterism Memory is a local-first conversational memory agent that turns scattered messages
-into organized, source-backed knowledge. It captures small "atomic memories" from
-conversations, groups them into meaningful topics and galaxies, and answers questions only
-from stored context — it helps people and teams remember what was said, why it mattered,
-and where it came from.
+Asterism Memory is a local-first conversational memory agent that turns scattered messages into organized, source-backed knowledge. It captures small "atomic memories" from conversations, groups them into meaningful topics and galaxies, and answers questions only from stored context — it helps people and teams remember what was said, why it mattered, and where it came from.
 
 ## The problem
 
-Imagine trying to find one important decision in a busy Slack channel. You remember someone
-said it last week, but not the exact words. You scroll threads, try a few keyword searches,
-open old messages — and still have to reconstruct the answer yourself. The same thing
-happens with AI-agent chats, where product strategy, database setup, and test coverage all
-blur into one long thread. People rarely lose context because they lack information; they
-lose it because information is scattered, duplicated, buried, or disconnected from its
-source:
+Imagine trying to find one important decision in a busy Slack channel. You remember someone said it last week, but not the exact words. You scroll threads, try a few keyword searches, open old messages — and still have to reconstruct the answer yourself. The same thing happens with AI-agent chats, where product strategy, database setup, and test coverage all blur into one long thread. People rarely lose context because they lack information; they lose it because information is scattered, duplicated, buried, or disconnected from its source:
 
 - Decisions are made in chat but never copied into documentation.
 - Ideas are repeated because nobody remembers where they were discussed.
@@ -23,19 +13,12 @@ source:
 
 ## What Asterism does
 
-- **Automatic memory capture** — an LLM splits each message into focused, atomic memories
-  (idea, decision, task, question, preference, fact, observation).
-- **Topic & galaxy organization** — memories are grouped into topics ("Atlas Onboarding",
-  "Camping Trip") inside broader galaxies ("Product", "Personal"); related follow-ups reuse
-  the existing topic instead of spawning near-duplicates.
-- **Source-backed recall** — every memory keeps provenance (message, source, timestamp,
-  permalink), so answers can be traced to the original conversation.
-- **Grounded question answering** — answers come only from retrieved stored memories, and
-  the system says "I don't have enough stored context" instead of inventing one.
-- **Duplicate-safe ingestion** — repeated deliveries of the same external event (Slack
-  retries included) never create duplicate memories.
-- **A 3D knowledge universe** — the React frontend renders topics as galaxy-grouped star
-  clouds you can explore, inspect, and query.
+- **Automatic memory capture** — an LLM splits each message into focused, atomic memories (idea, decision, task, question, preference, fact, observation).
+- **Topic & galaxy organization** — memories are grouped into topics ("Atlas Onboarding", "Camping Trip") inside broader galaxies ("Product", "Personal"); related follow-ups reuse the existing topic instead of spawning near-duplicates.
+- **Source-backed recall** — every memory keeps provenance (message, source, timestamp, permalink), so answers can be traced to the original conversation.
+- **Grounded question answering** — answers come only from retrieved stored memories, and the system says "I don't have enough stored context" instead of inventing one.
+- **Duplicate-safe ingestion** — repeated deliveries of the same external event (Slack retries included) never create duplicate memories.
+- **A 3D knowledge universe** — the React frontend renders topics as galaxy-grouped star clouds you can explore, inspect, and query.
 
 ## See it in action
 
@@ -43,13 +26,9 @@ Send one mixed message:
 
 > "For Atlas, remove phone number from signup. Separately I want to plan a camping trip."
 
-Asterism stores two memories under two different topics in two different galaxies. Ask
-later — *"What onboarding improvements have we discussed for Atlas?"* — and it answers from
-those stored memories with a "grounded in N memories" citation, never from general
-knowledge.
+Asterism stores two memories under two different topics in two different galaxies. Ask later — *"What onboarding improvements have we discussed for Atlas?"* — and it answers from those stored memories with a "grounded in N memories" citation, never from general knowledge.
 
-Full product context — target users, user stories, market analysis, roadmap:
-[docs/PRODUCT.md](docs/PRODUCT.md). Demo runbook: [DEMO.md](DEMO.md).
+Full product context — target users, user stories, market analysis, roadmap: [docs/PRODUCT.md](docs/PRODUCT.md). Demo runbook: [DEMO.md](DEMO.md).
 
 ---
 
@@ -65,11 +44,8 @@ message (web / Slack / seed)
                                 └─> POST /api/query   grounded answer, or insufficientContext
 ```
 
-- `backend/app/` — FastAPI app: `service.py` (MemoryEngine pipeline), `llm.py`
-  (OpenRouter client with structured outputs + heuristic fallback), `repository.py`
-  (Postgres), `slack_adapter.py` (DM-only Socket Mode ingestion).
-- `frontend/` — React "Observatory": 3D topic universe, topic inspector, ask/capture panel.
-  See [frontend/README.md](frontend/README.md).
+- `backend/app/` — FastAPI app: `service.py` (MemoryEngine pipeline), `llm.py` (OpenRouter client with structured outputs + heuristic fallback), `repository.py` (Postgres), `slack_adapter.py` (DM-only Socket Mode ingestion).
+- `frontend/` — React "Observatory": 3D topic universe, topic inspector, ask/capture panel. See [frontend/README.md](frontend/README.md).
 - `db/migrations/` — SQL schema, applied by `backend/scripts/migrate.py`.
 - Full request/response shapes: [backend/API_CONTRACT.md](backend/API_CONTRACT.md).
 
@@ -78,8 +54,7 @@ message (web / Slack / seed)
 - Python 3.11+ (`python -m pip install -r backend/requirements.txt`)
 - Docker (for Postgres 16)
 - Node 22+ (only for the frontend)
-- An [OpenRouter](https://openrouter.ai) API key for real LLM extraction. Without a key the
-  backend falls back to a deterministic heuristic client meant for tests only.
+- An [OpenRouter](https://openrouter.ai) API key for real LLM extraction. Without a key the backend falls back to a deterministic heuristic client meant for tests only.
 
 ## Environment variables
 
@@ -170,9 +145,7 @@ npm run dev    # http://localhost:5173
 
 ## Slack adapter (optional)
 
-DM-only ingestion over Socket Mode; requires `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`.
-Setup steps (scopes `im:history`, `chat:write`; bot event `message.im`) are in
-[backend/README.md](backend/README.md).
+DM-only ingestion over Socket Mode; requires `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`. Setup steps (scopes `im:history`, `chat:write`; bot event `message.im`) are in [backend/README.md](backend/README.md).
 
 ```bash
 python -m backend.scripts.run_slack
@@ -188,10 +161,8 @@ cd frontend && npm test && npm run typecheck
 
 ## Known limitations
 
-- Single-workspace demo model: everything defaults to the `demo` workspace; no auth or
-  multi-tenant separation.
+- Single-workspace demo model: everything defaults to the `demo` workspace; no auth or multi-tenant separation.
 - Retrieval is Postgres full-text (OR-of-terms, ranked), not semantic/embedding search.
 - The Slack adapter is DM-only and hardcodes the `demo` workspace.
-- Topic and galaxy names come from the LLM, so reseeding can produce slightly different
-  names run to run (structure is stable, names vary).
+- Topic and galaxy names come from the LLM, so reseeding can produce slightly different names run to run (structure is stable, names vary).
 - The frontend's 10-second polling is the only live-update mechanism (no websockets).
